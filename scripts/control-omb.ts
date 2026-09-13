@@ -334,6 +334,10 @@ export async function launchVerificationServer(
   /** A stand-in enterprise layer (the folder shape core loads) and the key
    * it should accept, so a recipe can prove entitled behaviour offline. */
   enterprise?: { dir: string; licenseKey: string },
+  room?: { scripted: boolean },
+  /** Optional repository-owned fake providers for multi-engine setup checks. */
+  extraProviders: Array<"codex"> = [],
+  /** Explicit replies override inherited FAKE_CLAUDE_REPLIES for this fixture. */
   fakeReplies?: readonly string[],
 ): Promise<VerificationServer> {
   if (localVm) {
@@ -356,10 +360,14 @@ export async function launchVerificationServer(
   const logPath = join(evidenceDir, `server-${Date.now()}-${process.pid}.log`);
   writeFileSync(join(dataDir, "config.json"), JSON.stringify({
     instances: {
+      ...(extraProviders.includes("codex") ? { codex: {
+        driver: "codex", displayName: "Verification Codex", config: { cli: fileURLToPath(new URL("../server/testing/fake-codex-app-server.ts", import.meta.url)) },
+      } } : {}),
       claude: {
         driver: "claudeAgent",
         displayName: "Verification fixture",
         config: { cli: FAKE_CLI },
+        ...(room?.scripted ? { environment: { FAKE_CLAUDE_ROOM_PLAN: join(dataDir, "room-plan.json") } } : {}),
       },
     },
   }, null, 2));

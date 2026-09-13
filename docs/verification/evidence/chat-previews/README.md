@@ -90,3 +90,25 @@ pnpm exec vitest run src/lib/file-preview.test.ts src/lib/office-preview-limits.
 
 The full cross-platform checks run in upstream CI; the earlier full local
 suite limitations above are retained rather than represented as passing.
+
+## Upstream integration (2026-09-13)
+
+Merged upstream `536b7893` without rewriting the PR history. The only textual
+conflict was the fixture launcher signature. Upstream `room` and `extraProviders`
+remain the sixth and seventh arguments; preview `fakeReplies` moves to the eighth
+argument, with both preview callers updated. Explicit replies still override
+inherited fake replies. No production preview component required conflict edits.
+
+Validation: frozen-lockfile install, production build, 99 focused tests in eight
+files, lint and locale catalog checks passed. A fresh disposable production
+fixture rendered PDF/XLSX/PPTX/PNG/MP4 thumbnails, PDF page 2, workbook Checks with
+literal HTML text, and slide 2. Inline video played on click (paused=false,
+time=0.225504, controls=true). The fixture closed with cleaned=true.
+
+Compare the prior `review-after.jpg` with `merge-after.jpg` for the real chat
+before and after upstream integration; the new upstream composer is retained.
+
+The CodeRabbit docstring-coverage warning remains an advisory documentation
+metric, not a failed executable check. Existing parser limits and cleanup are
+documented in code and the verification guide. The old CLA comment does not
+apply: the current proposal changes no enterprise files.
