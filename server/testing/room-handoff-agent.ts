@@ -3,6 +3,7 @@
 import { spawn } from "node:child_process";
 import { appendFileSync, readFileSync, existsSync } from "node:fs";
 import { createInterface } from "node:readline";
+import { waitForExit } from "./cleanup.ts";
 
 export async function runRoomHandoffAgent(argv: string[], planPath: string, prompt?: unknown): Promise<string> {
   const arg = (flag: string) => argv[argv.indexOf(flag) + 1];
@@ -30,7 +31,13 @@ export async function runRoomHandoffAgent(argv: string[], planPath: string, prom
     const waiter = pending.get(data.id);
     if (waiter) { pending.delete(data.id); waiter.resolve(data); }
   });
-  child.on("error", error => { for (const p of pending.values()) p.reject(error); pending.clear(); });
+  const rejectPending = (error: Error) => {
+    for (const p of pending.values()) p.reject(error);
+    pending.clear();
+  };
+  child.on("error", rejectPending);
+  child.on("exit", (code, signal) => rejectPending(new Error(`Fixture MCP process exited before responding: code=${code}, signal=${signal}`)));
+  child.stdin.on("error", rejectPending);
   const call = (method: string, params: unknown = {}) => new Promise<any>((resolve, reject) => {
     const id = ++serial; pending.set(id, { resolve, reject });
     child.stdin.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n");
@@ -54,7 +61,7 @@ export async function runRoomHandoffAgent(argv: string[], planPath: string, prom
     return basePlan.turns ? plan.reply : resumed ? plan.resumeReply ?? `Summary from ${botId}` : plan.reply ?? `Result from ${botId}`;
   } finally {
     appendFileSync(`${planPath}.evidence.jsonl`, JSON.stringify({ botId, turnIndex, threadId: integration.env.OMB_THREAD_ID, resumed, system, prompt, evidence }) + "\n");
-    clearTimeout(timer); lines.close(); child.stdin.end();
-    await new Promise<void>(resolve => { if (child.exitCode !== null) resolve(); else { child.once("exit", () => resolve()); child.kill(); } });
+    clearTimeout(timer); lines.close(); child.stdin.destroy();
+    await waitForExit(child, { signal: "SIGTERM", graceMs: 500 });
   }
 }

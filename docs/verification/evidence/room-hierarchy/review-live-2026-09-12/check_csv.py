@@ -12,7 +12,8 @@ room = next(t for t in report['transcripts'] if t['name'] == '実装チーム')
 message = next(m for m in room['messages']
                if m.get('from', {}).get('name') == 'ヒナ' and '```csv' in m.get('text', ''))
 source = re.search(r'```csv\n(.*?)\n```', message['text'], re.S).group(1)
-(root / 'sample.csv').write_text(source, encoding='utf-8', newline='')
+with (root / 'sample.csv').open('w', encoding='utf-8', newline='') as output:
+    output.write(source)
 rows = list(csv.reader(io.StringIO(source), strict=True))
 header = '顧客名,契約ID,契約日,担当営業,商談ステータス,受注金額,失注理由'.split(',')
 reasons = {'価格', '機能不足', '競合選択', 'タイミング', '決裁権者未了', 'その他'}
@@ -39,7 +40,8 @@ result = {
                'Passing draft checks does not satisfy the later eight-column decision.',
                'No file-byte, runtime export, or production-readiness claim.'],
 }
-(root / 'csv-checks.json').write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n', encoding='utf-8', newline='\n')
+with (root / 'csv-checks.json').open('w', encoding='utf-8', newline='\n') as output:
+    output.write(json.dumps(result, ensure_ascii=False, indent=2) + '\n')
 print(json.dumps(result, ensure_ascii=False, indent=2))
 assert result['draftChecksPassed']
 # This historical run must reproduce the recorded final-contract failure too.
