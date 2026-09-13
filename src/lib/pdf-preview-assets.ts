@@ -6,13 +6,17 @@ const assets = {
   wasmUrl: import.meta.glob('../../node_modules/pdfjs-dist/wasm/*.wasm', { query: '?url', import: 'default', eager: true }),
 };
 
-export class PreviewBinaryDataFactory {
-  async fetch({ kind, filename }: { kind: keyof typeof assets; filename: string }): Promise<Uint8Array> {
-    const entries = assets[kind];
-    const url = entries && Object.entries(entries).find(([path]) => path.split('/').at(-1) === filename)?.[1];
-    if (typeof url !== 'string') throw new Error('Unknown PDF resource');
-    const response = await fetch(url);
-    if (!response.ok) throw new Error('PDF resource unavailable');
-    return new Uint8Array(await response.arrayBuffer());
-  }
+/** Bind auxiliary PDF resources to one preview; PDF.js does not supply a signal. */
+export function createPreviewBinaryDataFactory(signal: AbortSignal) {
+  return class PreviewBinaryDataFactory {
+    async fetch({ kind, filename }: { kind: keyof typeof assets; filename: string }): Promise<Uint8Array> {
+      signal.throwIfAborted();
+      const entries = assets[kind];
+      const url = entries && Object.entries(entries).find(([path]) => path.split('/').at(-1) === filename)?.[1];
+      if (typeof url !== 'string') throw new Error('Unknown PDF resource');
+      const response = await fetch(url, { signal });
+      if (!response.ok) throw new Error('PDF resource unavailable');
+      return new Uint8Array(await response.arrayBuffer());
+    }
+  };
 }

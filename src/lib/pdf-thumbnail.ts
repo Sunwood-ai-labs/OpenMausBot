@@ -1,12 +1,14 @@
 import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-import { PreviewBinaryDataFactory } from './pdf-preview-assets';
+import { createPreviewBinaryDataFactory } from './pdf-preview-assets';
 
 GlobalWorkerOptions.workerSrc = workerUrl;
 
 export async function renderPdfThumbnail(data: Uint8Array, canvas: HTMLCanvasElement, signal: AbortSignal) {
-  const task = getDocument({ data: data.slice(), enableXfa: false, useSystemFonts: true, useWorkerFetch: false, BinaryDataFactory: PreviewBinaryDataFactory, maxImageSize: 16_000_000 });
-  const abort = () => { void task.destroy(); };
+  const controller = new AbortController();
+  const resourceSignal = AbortSignal.any([signal, controller.signal]);
+  const task = getDocument({ data: data.slice(), enableXfa: false, useSystemFonts: true, useWorkerFetch: false, BinaryDataFactory: createPreviewBinaryDataFactory(resourceSignal), maxImageSize: 16_000_000 });
+  const abort = () => { controller.abort(); void task.destroy(); };
   signal.addEventListener('abort', abort, { once: true });
   const timeout = setTimeout(abort, 30_000);
   try {
@@ -20,6 +22,7 @@ export async function renderPdfThumbnail(data: Uint8Array, canvas: HTMLCanvasEle
     canvas.height = Math.max(1, Math.floor(viewport.height));
     await page.render({ canvas, viewport }).promise;
   } finally {
+    controller.abort();
     clearTimeout(timeout);
     signal.removeEventListener('abort', abort);
     await task.destroy();

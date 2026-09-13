@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, Minus, Plus, Scan } from 'lucide-react';
 import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy } from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { t } from '@/lib/i18n';
-import { PreviewBinaryDataFactory } from '@/lib/pdf-preview-assets';
+import { createPreviewBinaryDataFactory } from '@/lib/pdf-preview-assets';
 
 GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -19,12 +19,13 @@ export default function PdfPreview({ data, onError }: { data: Uint8Array; onErro
 
   useEffect(() => {
     // The worker transfers ownership; copy so StrictMode and retries keep valid bytes.
-    const task = getDocument({ data: data.slice(), enableXfa: false, useSystemFonts: true, useWorkerFetch: false, BinaryDataFactory: PreviewBinaryDataFactory, maxImageSize: 16_000_000 });
+    const controller = new AbortController();
+    const task = getDocument({ data: data.slice(), enableXfa: false, useSystemFonts: true, useWorkerFetch: false, BinaryDataFactory: createPreviewBinaryDataFactory(controller.signal), maxImageSize: 16_000_000 });
     let alive = true;
     void task.promise.then((document) => { if (alive) setPdf(document); }).catch((error) => {
       if (alive) onError(t(error?.name === 'PasswordException' ? 'filePreview.password' : 'filePreview.invalidPdf'));
     });
-    return () => { alive = false; void task.destroy(); };
+    return () => { alive = false; controller.abort(); void task.destroy(); };
   }, [data, onError]);
 
   useEffect(() => {
